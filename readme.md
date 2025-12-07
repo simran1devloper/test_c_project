@@ -1,114 +1,32 @@
-# LiveKit Intelligent Interruption Engine (Switchable & Hybrid)
+# Feature Extractors
 
-This repository implements a **Strategy-Pattern** based interruption handling system for LiveKit Agents. It allows dynamic switching of interruption logic (Rule-based, ML, LLM, or RAG) without changing application code.
+This directory contains the components responsible for converting raw input (audio metadata + STT transcript) into structured features for the `InterruptionManager`.
 
-![Project Flowchart](/home/sonia/.gemini/antigravity/brain/85f7df8a-6c3c-4754-9833-3d6f65982f32/interrupt_manager_flowchart_v2_1765096776442.png)
+## Components
 
-```mermaid
-graph TD
-    A[Start: Transcript & VAD] --> B[Feature Extraction]
-    B --> B1[Overlap Detector]
-    B --> B2[Filler Detector]
-    B --> B3[Semantic Intent]
-    
-    B1 & B2 & B3 --> C{Mode Selector}
-    
-    C -- Simple Command --> D1[Rules Engine]
-    C -- Low Latency/Gap --> D2[ML Engine]
-    C -- Complex/Ambiguous --> D3[LLM Engine]
-    C -- Policies/FAQ --> D4[RAG Engine]
-    
-    D1 & D2 & D3 & D4 --> E[Decision]
-    
-    E -->|INTERRUPT| F[Stop TTS]
-    E -->|IGNORE| G[Continue Speaking]
-    E -->|NORMAL| H[Process User Input]
-```
+### 1. Overlap Detector (`overlap_detector.py`)
+- **Input:** User start timestamp, Agent start timestamp.
+- **Logic:** Checks if the user started speaking *while* the agent was currently speaking.
+- **Output:** `Boolean` (True if overlap occurred).
+- **Why?** Interruption requires overlap. If the agent wasn't speaking, it's just a normal turn, not an interrupt.
 
-## 🚀 Features
+### 2. Filler Detector (`filler_detector.py`)
+- **Input:** Transcript text.
+- **Logic:** Uses Regex to detect common backchannels (e.g., "yeah", "uh-huh", "hmm", "ok").
+- **Output:** `Boolean` or Score.
+- **Why?** We want to **IGNORE** backchannels so the agent keeps talking, rather than stopping for every "uh-huh".
 
-*   **Switchable Engines:** Change logic without changing code via `INTERRUPT_MODE`.
-*   **Hybrid Automatic Switching:** Uses fast Rules for simple cases ("yeah", "stop") and escalates to LLM/RAG for complex queries.
-*   **LLM Provider Agnostic:** Supports OpenAI, Google Gemini, and Ollama via Factory pattern.
-*   **RAG-Enhanced Decisions:** Retrieves context-aware interruption rules from a vector store, perfect for domain-specific agent interactions.
-*   **Microservice Ready:** Engines are decoupled and can be moved to external inference services.
+### 3. Semantic Intent Classifier (`semantic_intent.py`)
+- **Input:** Transcript text.
+- **Logic:**
+    1.  **Keyword Search:** Fast check for "stop", "wait", "hold on".
+    2.  **LLM Fallback:** If ambiguous, optionally asks an LLM "Is this an interrupt?".
+- **Output:** `INTERRUPT`, `IGNORE`, or `NORMAL`.
 
-## 🛠 Configuration
+### 4. Noise Classifier (`noise_classifier.py`)
+- **Input:** Raw audio frames (Energy) or Transcript (Text).
+- **Logic:** Detects non-speech events (coughing, background noise).
+- **Output:** `clean` or `noise`.
 
-Configuration is managed via environment variables (see `.env.example` or `config.py`).
-
-| Variable | Options | Description |
-| :--- | :--- | :--- |
-| `INTERRUPT_MODE` | `RULES`, `ML`, `LLM`, `RAG`, `HYBRID` | Determines the active logic engine. |
-| `LLM_PROVIDER` | `gpt`, `gemini`, `ollama` | Provider for LLM/RAG modes. |
-| `LLM_MODEL_NAME` | `gpt-4o`, `llama3`, etc. | Model identifier. |
-| `LK_IGNORE_WORDS` | List (csv) | Words to ignore in RULES mode (e.g., "yeah,ok"). |
-| `RAG_VECTORSTORE_DIR`| Path | Path to ChromaDB/Vector store for RAG mode. |
-| `RAG_K_CONTEXT` | Integer | Number of context documents to retrieve. |
-
-## 🏗 Architecture & Engines
-
-The system uses a **Strategy Pattern** to select the best engine at runtime:
-
-1.  **`RulesEngine`**: Ultra-low latency O(1) keyword regex matching. Best for simple command agents.
-2.  **`MLEngine`**: Uses lightweight trained models (LSTM/DistilBERT) on acoustic features (overlap, pitch, energy).
-3.  **`LLMEngine`**: Uses Large Language Models to detect semantic intent.
-4.  **`RAGEngine`**: **(New)** Uses Retrieval-Augmented Generation to look up specific interruption rules or conversation policies from a vector database before making a decision.
-
-### Mode Selector
-The `ModeSelector` component dynamically routes requests based on complexity and available compute:
-- Simple "stop" command -> **RULES**
-- "Can you explain that policy again?" -> **RAG** (if configured)
-- Complex ambiguity -> **LLM**
-
-## � Runtime Logic Flow
-
-Every time the user speaks (STT transcript received) or a VAD event occurs, the system executes the following pipeline:
-
-1.  **Input Capture**: The `InterruptionManager` receives the live transcript and audio metadata (VAD status, timestamps).
-2.  **Feature Extraction**:
-    *   **OverlapDetector**: Did the user speak *while* the agent was speaking?
-    *   **FillerDetector**: Is the input just a backchannel like "uh-huh"?
-    *   **SemanticIntent**: Does the text contain explicit keywords ("Stop", "Wait")?
-3.  **Mode Selection**: The `ModeSelector` evaluates the features and system constraints (latency budget).
-    *   *Example*: If overlap is detected and the user said "Stop", it selects **RULES** (fastest).
-    *   *Example*: If the user asks a complex question, it selects **RAG** or **LLM**.
-4.  **Engine Execution**: The selected engine runs its logic to produce a decision (`INTERRUPT`, `IGNORE`, or `NORMAL`).
-5.  **Action**:
-    *   **INTERRUPT**: The agent effectively stops speaking immediately.
-    *   **IGNORE**: The agent ignores the noise/filler and continues speaking.
-    *   **NORMAL**: The input is treated as a standard user turn, usually processed by the main agent loop.
-
-## �📦 Setup & Installation
-
-### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-# For Rules Engine
-pip install nltk
-```
-
-### 2. RAG System Setup
-To use the RAG-based system (`INTERRUPT_MODE="RAG"`):
-
-1.  **Install Vector Store dependencies**:
-    ```bash
-    pip install chromadb langchain-community
-    ```
-2.  **Prepare your Knowledge Base**:
-    Create a vector store at the path specified by `RAG_VECTORSTORE_DIR` containing your interruption rules (e.g., "Always stop if user asks for pricing").
-3.  **Configure Environment**:
-    ```bash
-    export INTERRUPT_MODE="RAG"
-    export RAG_VECTOR_STORE_PATH="./rag_data/chroma_db"
-    export LLM_PROVIDER="ollama" # or gpt/gemini
-    ```
-
-### 3. Run Verification
-A demo script is included to verify the logic without a full LiveKit connection:
-```bash
-python3 -m tool.demo
-```
-
-## 🤝 Contributing
-Contributions are welcome! Please follow the standard fork-branch-PR workflow.
+## Usage in Pipeline
+The `InterruptionManager` calls these extractors in parallel to build a `features` dictionary, which is then passed to the `ModeSelector`.
