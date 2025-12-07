@@ -1,7 +1,8 @@
 ```mermaid 
-graph TD
-User([User / Client])
+graph LR
+    User([User / Client])
     
+    %% --- FASTAPI SERVER ---
     subgraph "FastAPI Server"
         direction TB
         MainEntry["Main Entry\n(Backend/api/main.py)"]
@@ -22,6 +23,7 @@ User([User / Client])
         KB[(Chroma DB)]
     end
     
+    %% --- AGENT SYSTEM ---
     subgraph "Agent System"
         direction TB
         Agent["Food Agent"]
@@ -63,17 +65,18 @@ User([User / Client])
     %% Loopback (Dotted Lines)
     ToolSearch -.->|GET /menu/search| MainEntry
     ToolCreate -.->|POST /order/create| MainEntry
-    ToolView -.->|GET /order/id| MainEntry
-    ToolConfirm -.->|POST /order/id| MainEntry
+    ToolView -.->|GET /order/{id}| MainEntry
+    ToolConfirm -.->|POST /order/{id}| MainEntry
     
-    %% Styling
-    classDef server fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
-    classDef agent fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
-    classDef storage fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    %% Dark Theme Styling (High Contrast)
+    classDef server fill:#0d47a1,stroke:#82b1ff,color:#ffffff,stroke-width:2px;
+    classDef agent fill:#4a148c,stroke:#ce93d8,color:#ffffff,stroke-width:2px;
+    classDef storage fill:#bf360c,stroke:#ffab91,color:#ffffff,stroke-width:2px;
     
     class MainEntry,RouterMenu,RouterOrder,RouterRAG,SvcMenu,SvcOrder,SvcRAG server;
     class Agent,LLM,ToolSearch,ToolCreate,ToolView,ToolConfirm agent;
     class DB,KB storage;
+
 ```
     class Agent,LLM,ToolSearch,ToolCreate,ToolView,ToolConfirm agent;
     class DB,KB db;
