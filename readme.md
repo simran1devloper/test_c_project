@@ -4,6 +4,27 @@ This repository implements a **Strategy-Pattern** based interruption handling sy
 
 ![Project Flowchart](/home/sonia/.gemini/antigravity/brain/85f7df8a-6c3c-4754-9833-3d6f65982f32/interrupt_manager_flowchart_v2_1765096776442.png)
 
+```mermaid
+graph TD
+    A[Start: Transcript & VAD] --> B[Feature Extraction]
+    B --> B1[Overlap Detector]
+    B --> B2[Filler Detector]
+    B --> B3[Semantic Intent]
+    
+    B1 & B2 & B3 --> C{Mode Selector}
+    
+    C -- Simple Command --> D1[Rules Engine]
+    C -- Low Latency/Gap --> D2[ML Engine]
+    C -- Complex/Ambiguous --> D3[LLM Engine]
+    C -- Policies/FAQ --> D4[RAG Engine]
+    
+    D1 & D2 & D3 & D4 --> E[Decision]
+    
+    E -->|INTERRUPT| F[Stop TTS]
+    E -->|IGNORE| G[Continue Speaking]
+    E -->|NORMAL| H[Process User Input]
+```
+
 ## 🚀 Features
 
 *   **Switchable Engines:** Change logic without changing code via `INTERRUPT_MODE`.
