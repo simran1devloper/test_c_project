@@ -65,8 +65,8 @@ graph LR
     %% Loopback (Dotted Lines)
     ToolSearch -.->|GET /menu/search| MainEntry
     ToolCreate -.->|POST /order/create| MainEntry
-    ToolView -.->|GET /order/{id}| MainEntry
-    ToolConfirm -.->|POST /order/{id}| MainEntry
+    ToolView -.->|GET /order/id| MainEntry
+    ToolConfirm -.->|POST /order/id| MainEntry
     
     %% Dark Theme Styling (High Contrast)
     classDef server fill:#0d47a1,stroke:#82b1ff,color:#ffffff,stroke-width:2px;
