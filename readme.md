@@ -1,31 +1,33 @@
 ```mermaid 
 graph TD
-    User([User / Client])
+User([User / Client])
     
-    subgraph "FastAPI Server (Port 8000)"
+    subgraph "FastAPI Server"
+        direction TB
         MainEntry["Main Entry\n(Backend/api/main.py)"]
         
         subgraph "Routers"
-            RouterMenu["/menu Router\n(menu_routes.py)"]
-            RouterOrder["/order Router\n(order_routes.py)"]
-            RouterRAG["/rag Router\n(rag_routes.py)"]
+            RouterMenu["/menu"]
+            RouterOrder["/order"]
+            RouterRAG["/rag"]
         end
         
-        subgraph "Services (Business Logic)"
-            SvcMenu["Menu Service\n(menu_service.py)"]
-            SvcOrder["Order Service\n(order_service.py)"]
-            SvcRAG["RAG Service\n(rag_service.py)"]
+        subgraph "Services"
+            SvcMenu["Menu Svc"]
+            SvcOrder["Order Svc"]
+            SvcRAG["RAG Svc"]
         end
         
-        DB[(SQLite Database)]
-        KB[(RAG Knowledge Base\nChroma DB)]
+        DB[(SQLite)]
+        KB[(Chroma DB)]
     end
     
     subgraph "Agent System"
-        Agent["Food Agent\n(food_agent.py)"]
-        LLM["LLM Model\n(gpt-4o-mini)"]
+        direction TB
+        Agent["Food Agent"]
+        LLM["LLM (gpt-4o)"]
         
-        subgraph "Agent Tools (tools.py)"
+        subgraph "Tools"
             ToolSearch["search_menu"]
             ToolCreate["create_order"]
             ToolView["view_order"]
@@ -33,14 +35,13 @@ graph TD
         end
     end
 
-    %% Flow Definitions
-    User -->|HTTP Requests| MainEntry
+    %% Main Request Flow
+    User -->|HTTP| MainEntry
     
     MainEntry --> RouterMenu
     MainEntry --> RouterOrder
     MainEntry --> RouterRAG
     
-    %% Direct API Usage
     RouterMenu --> SvcMenu
     RouterOrder --> SvcOrder
     RouterRAG --> SvcRAG
@@ -49,27 +50,30 @@ graph TD
     SvcOrder --> DB
     SvcRAG --> KB
     
-    %% Agentic Flow
+    %% Agent Interaction
     RouterRAG -->|"/query"| Agent
-    Agent -->|Context/Prompts| LLM
-    Agent -->|Retrieval| KB
+    Agent <-->|Context| KB
+    Agent <-->|Prompt| LLM
     
-    Agent -->|Calls| ToolSearch
-    Agent -->|Calls| ToolCreate
-    Agent -->|Calls| ToolView
-    Agent -->|Calls| ToolConfirm
+    Agent --> ToolSearch
+    Agent --> ToolCreate
+    Agent --> ToolView
+    Agent --> ToolConfirm
     
-    %% Tools Loopback (Interesting Pattern)
-    ToolSearch -.->|HTTP GET /menu/search| MainEntry
-    ToolCreate -.->|HTTP POST /order/create| MainEntry
-    ToolView -.->|HTTP GET /order/id| MainEntry
-    ToolConfirm -.->|HTTP POST /order/id/confirm| MainEntry
-
+    %% Loopback (Dotted Lines)
+    ToolSearch -.->|GET /menu/search| MainEntry
+    ToolCreate -.->|POST /order/create| MainEntry
+    ToolView -.->|GET /order/{id}| MainEntry
+    ToolConfirm -.->|POST /order/{id}| MainEntry
+    
+    %% Styling
     classDef server fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
     classDef agent fill:#f3e5f5,stroke:#4a148c,stroke-width:2px;
-    classDef db fill:#fff3e0,stroke:#e65100,stroke-width:2px;
+    classDef storage fill:#fff3e0,stroke:#e65100,stroke-width:2px;
     
     class MainEntry,RouterMenu,RouterOrder,RouterRAG,SvcMenu,SvcOrder,SvcRAG server;
+    class Agent,LLM,ToolSearch,ToolCreate,ToolView,ToolConfirm agent;
+    class DB,KB storage;
 ```
     class Agent,LLM,ToolSearch,ToolCreate,ToolView,ToolConfirm agent;
     class DB,KB db;
